@@ -186,8 +186,6 @@ export async function callActionRequest<T = JsonValue>(
   let lastError: unknown;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    if (attempt > 0) await sleep(retryDelayMs(attempt - 1));
-
     let response: Response;
     try {
       response = await fetch(url, {
@@ -202,6 +200,7 @@ export async function callActionRequest<T = JsonValue>(
       if (options.signal?.aborted) throw error;
       lastError = error;
       if (attempt === MAX_RETRIES) break;
+      await sleep(retryDelayMs(attempt));
       continue;
     }
 
