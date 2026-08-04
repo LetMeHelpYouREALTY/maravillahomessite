@@ -82,6 +82,48 @@ To test Stripe payments, use the following test card details:
 - Expiration: Any future date
 - CVC: Any 3-digit number
 
+## CallAction API
+
+Server-side proxy routes for the [CallAction](https://callaction.co) v2 API. The
+account API token stays on the server; the browser talks only to these routes,
+and every one of them requires a signed-in session.
+
+Set `CALLACTION_API_TOKEN` in your `.env` (see `.env.example` for the optional
+overrides: base URL, auth style, and request timeout).
+
+| Route | Upstream | Query parameters |
+| --- | --- | --- |
+| `GET /api/callaction/contacts` | `GET /v2/contacts` | `page`, `per_page`, `channel_id`, `source_id`, `search` |
+| `GET /api/callaction/contacts?start_date=&end_date=` | `GET /v2/contacts` | as above, date-bounded |
+| `GET /api/callaction/contacts/{contactId}/activity` | `GET /v2/contacts/{contactId}/activity` | `page`, `per_page`, `type`, `start_date`, `end_date` |
+| `GET /api/callaction/channels` | `GET /v2/channels` | `page`, `per_page` |
+| `GET /api/callaction/sources` | `GET /v2/sources` | `page`, `per_page` |
+
+`start_date`/`end_date` accept ISO-8601 dates or date-times and may also be
+written as `from`/`to`. They are all-or-nothing: sending one without the other,
+or a range that runs backwards, returns `400`.
+
+Every route responds with a normalized `{ "data": [...], "meta": {...} }`
+envelope regardless of whether CallAction returned a bare array or a wrapped
+object:
+
+```bash
+curl --cookie "session=..." \
+  "http://localhost:3000/api/callaction/contacts?start_date=2026-01-01&end_date=2026-01-31&per_page=50"
+```
+
+To call the API from your own server code, skip the routes and use the client
+directly:
+
+```ts
+import { listContacts } from '@/lib/callaction/client';
+
+const { data, meta } = await listContacts({ start_date: '2026-01-01', end_date: '2026-01-31' });
+```
+
+The client retries `429` and `5xx` responses twice with backoff (honouring
+`Retry-After`) and throws `CallActionApiError` for anything else.
+
 ## Going to Production
 
 When you're ready to deploy your SaaS application to production, follow these steps:
@@ -107,6 +149,7 @@ In your Vercel project settings (or during deployment), add all the necessary en
 3. `STRIPE_WEBHOOK_SECRET`: Use the webhook secret from the production webhook you created in step 1.
 4. `POSTGRES_URL`: Set this to your production database URL.
 5. `AUTH_SECRET`: Set this to a random string. `openssl rand -base64 32` will generate one.
+6. `CALLACTION_API_TOKEN`: Your CallAction account API token.
 
 ## Other Templates
 
